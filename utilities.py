@@ -1,5 +1,7 @@
 import datetime
 import matplotlib.pyplot as plt
+import pandas as pd
+from math import ceil, sqrt
 # Super simple timer
 #  Timing implemented as class methods
 #  to avoid having to instantiate
@@ -100,3 +102,9 @@ def plot(fn, *args, **kwargs):
     kwargs['ax'] = ax
     fn(*args, **kwargs)
     return fig
+
+def drop_by_rule(df, bool_series):
+    index = df[bool_series].index
+    df.drop(index = index, inplace = True)
+
+# def compare_statsmodels_models
