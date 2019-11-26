@@ -31,6 +31,9 @@ class FeaturePlot:
         self.num_cols = len(self.columns)
         self._make_figure()
 
+    def clone(self):
+        return FeaturePlot(self.data)
+
     def _make_figure(self):
         '''
            Makes the main figure
@@ -106,5 +109,3 @@ def plot(fn, *args, **kwargs):
 def drop_by_rule(df, bool_series):
     index = df[bool_series].index
     df.drop(index = index, inplace = True)
-
-# def compare_statsmodels_models
