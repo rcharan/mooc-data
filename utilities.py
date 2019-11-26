@@ -90,3 +90,13 @@ class FeaturePlot:
     def __iter__(self):
         for col in self.columns:
             yield col, self.data[col].values, self.axes[col]
+
+def plot(fn, *args, **kwargs):
+    if 'figsize' in kwargs:
+        fig, ax = plt.subplots(figsize = kwargs['figsize'])
+        del kwargs['figsize']
+    else:
+        fig, ax = plt.subplots()
+    kwargs['ax'] = ax
+    fn(*args, **kwargs)
+    return fig
