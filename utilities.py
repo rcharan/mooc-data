@@ -10,6 +10,13 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+
+################################################################################
+#
+# Part 1 : Some simple convenience functions for maps and filters
+#
+################################################################################
+
 def compose(*funcs):
     outer = funcs[:-1][::-1] # Python only provides left folds
     def composed_func(*args, **kwargs):
@@ -17,7 +24,7 @@ def compose(*funcs):
         return functools.reduce(lambda val, func : func(val), outer, inner)
     return composed_func
 
-# Aliases for filters
+# Aliases for filters and maps
 lfilter        = compose(list, filter)
 lmap           = compose(list, map)
 afilter        = compose(np.array, list, filter)
@@ -26,31 +33,45 @@ lfilternull    = compose(list, filternull)
 filternullmap  = compose(filternull, map)
 lfilternullmap = compose(lfilternull, map)
 
+################################################################################
+#
+# Part 2 : Some simple convenience functions for dropping data in dataframes
+#
+################################################################################
+
 def drop_col(df, *cols):
     df.drop(columns = list(cols), inplace = True)
 
-# Super simple timer
-#  Timing implemented as class methods
-#  to avoid having to instantiate
-class Timer:
 
-    @classmethod
-    def start(cls):
-        cls.start_time = datetime.datetime.now()
+def drop_by_rule(df, bool_series):
+    index = df[bool_series].index
+    df.drop(index = index, inplace = True)
 
-    @classmethod
-    def end(cls):
-        delta = datetime.datetime.now() - cls.start_time
-        sec = delta.seconds
-        ms  = delta.microseconds // 1000
-        print(f'{sec}.{ms} seconds elapsed')
+################################################################################
+#
+# Part 3 : Convenience functions for plotting
+#
+################################################################################
+
+# With pyplot interactive mode off (via plt.ioff() call)
+#  every call needs a figure and axis created
+#  this provides a simple way to create such a figure
+def plot(fn, *args, **kwargs):
+    if 'figsize' in kwargs:
+        fig, ax = plt.subplots(figsize = kwargs['figsize'])
+        del kwargs['figsize']
+    else:
+        fig, ax = plt.subplots()
+    kwargs['ax'] = ax
+    fn(*args, **kwargs)
+    return fig
 
 
 class FeaturePlot:
     '''
         Manages a figure containing plots of many unrelated variables
         To use: this is an iterable that will yield (col_name, data, axis)
-        for each variable it contains
+        for each variable it contains. For overlays, call overlay
     '''
     def __init__(self, *data, axsize = 4):
         self.data     = pd.concat(data, axis = 'columns')
@@ -123,22 +144,83 @@ class FeaturePlot:
         for col in self.columns:
             yield col, self.data[col].values, self.axes[col]
 
-def plot(fn, *args, **kwargs):
-    if 'figsize' in kwargs:
-        fig, ax = plt.subplots(figsize = kwargs['figsize'])
-        del kwargs['figsize']
-    else:
-        fig, ax = plt.subplots()
-    kwargs['ax'] = ax
-    fn(*args, **kwargs)
+
+################################################################################
+#
+# Part 4 : Miscellaneous conveniences
+#
+################################################################################
+
+# Create a correlation matrix heat map
+# Modified from the Seaborn Gallery
+# https://seaborn.pydata.org/examples/many_pairwise_correlations.html
+def correlation_matrix(data):
+    # Compute the correlation matrix
+    corr = data.corr()
+
+    # Generate a mask for the upper triangle
+    mask = np.zeros_like(corr, dtype=np.bool)
+    mask[np.triu_indices_from(mask)] = True
+
+    # Set up the matplotlib figure
+    fig, ax = plt.subplots(figsize=(11, 9))
+
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(220, 10, as_cmap=True)
+
+    # Draw the heatmap with the mask and correct aspect ratio
+    sns.heatmap(corr, mask=mask, cmap=cmap, vmax=.3, center=0,
+                square=True, linewidths=.5, cbar_kws={"shrink": .5}, ax = ax)
+
     return fig
 
-def drop_by_rule(df, bool_series):
-    index = df[bool_series].index
-    df.drop(index = index, inplace = True)
+# Create a table with the Variance Inflation Factors for each variable in a
+#  dataframe of X-vars (exog in statsmodel speak)
+# Essentially a wrapper for statsmodels variance_inflation_factor
+def vif_table(df_x):
+    return pd.Series({
+        var_name : variance_inflation_factor(df_x.dropna().values, i)
+        for i, var_name in enumerate(df_x.columns)
+    }).sort_values(ascending = False)
 
-# Simple class to keep track of our model
+
+# Super simple timer
+#  Timing implemented as class methods
+#  to avoid having to instantiate
+class Timer:
+
+    @classmethod
+    def start(cls):
+        cls.start_time = datetime.datetime.now()
+
+    @classmethod
+    def end(cls):
+        delta = datetime.datetime.now() - cls.start_time
+        sec = delta.seconds
+        ms  = delta.microseconds // 1000
+        print(f'{sec}.{ms} seconds elapsed')
+
+
+
+
+################################################################################
+#
+# Part 5 : Class to keep track of models
+#
+################################################################################
+
 class Model:
+    '''
+      A model is a collection of a y variable, a list of continuous
+      variables, categorical variables, and interactions.
+      Features:
+       - can built patsy formulas for statsmodels formulas api to regression
+       - can run OLS using regression
+       - can save and restore a state
+
+      Note: does not store data. Just remembers which IVs and DV are in a
+       model
+    '''
 
     def __init__(self, y, X_cat, X_cont, interactions = []):
         self.y = y
@@ -238,31 +320,3 @@ class Model:
     def clone(self):
         out = Model(self.y, self.X_cat, self.X_cont, self.interactions)
         return out
-
-# Modified from the Seaborn Gallery
-# https://seaborn.pydata.org/examples/many_pairwise_correlations.html
-def correlation_matrix(data):
-    # Compute the correlation matrix
-    corr = data.corr()
-
-    # Generate a mask for the upper triangle
-    mask = np.zeros_like(corr, dtype=np.bool)
-    mask[np.triu_indices_from(mask)] = True
-
-    # Set up the matplotlib figure
-    fig, ax = plt.subplots(figsize=(11, 9))
-
-    # Generate a custom diverging colormap
-    cmap = sns.diverging_palette(220, 10, as_cmap=True)
-
-    # Draw the heatmap with the mask and correct aspect ratio
-    sns.heatmap(corr, mask=mask, cmap=cmap, vmax=.3, center=0,
-                square=True, linewidths=.5, cbar_kws={"shrink": .5}, ax = ax)
-
-    return fig
-
-def vif_table(df_x):
-    return pd.Series({
-        var_name : variance_inflation_factor(df_x.dropna().values, i)
-        for i, var_name in enumerate(df_x.columns)
-    }).sort_values(ascending = False)
