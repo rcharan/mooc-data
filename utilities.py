@@ -7,6 +7,8 @@ import numpy as np
 import collections
 import seaborn as sns
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 def compose(*funcs):
     outer = funcs[:-1][::-1] # Python only provides left folds
@@ -16,15 +18,16 @@ def compose(*funcs):
     return composed_func
 
 # Aliases for filters
-lfilter       = compose(list, filter)
-lmap          = compose(list, map)
-afilter       = compose(np.array, list, filter)
-filternull    = functools.partial(filter, None)
-filternullmap = compose(filternull, map)
+lfilter        = compose(list, filter)
+lmap           = compose(list, map)
+afilter        = compose(np.array, list, filter)
+filternull     = functools.partial(filter, None)
+lfilternull    = compose(list, filternull)
+filternullmap  = compose(filternull, map)
+lfilternullmap = compose(lfilternull, map)
 
-def drop_col(df, col):
-    df.drop(col, axis = 'columns', inplace = True)
-
+def drop_col(df, *cols):
+    df.drop(columns = list(cols), inplace = True)
 
 # Super simple timer
 #  Timing implemented as class methods
@@ -49,23 +52,23 @@ class FeaturePlot:
         To use: this is an iterable that will yield (col_name, data, axis)
         for each variable it contains
     '''
-    def __init__(self, *data):
+    def __init__(self, *data, axsize = 4):
         self.data     = pd.concat(data, axis = 'columns')
         self.columns  = self.data.columns
         self.num_cols = len(self.columns)
-        self._make_figure()
+        self._make_figure(axsize)
 
     def clone(self):
         return FeaturePlot(self.data)
 
-    def _make_figure(self):
+    def _make_figure(self, axsize):
         '''
            Makes the main figure
         '''
 
         # Compute the size and get fig, axes
         s = ceil(sqrt(self.num_cols))
-        fig, axes = plt.subplots(s, s, figsize = (4*s, 4*s));
+        fig, axes = plt.subplots(s, s, figsize = (axsize*s, axsize*s));
         axes = axes.ravel()
 
         # Delete excess axes
@@ -142,6 +145,8 @@ class Model:
         self.X_cat = X_cat.copy()
         self.X_cont = X_cont.copy()
         self.interactions = interactions.copy()
+        self.state_dict = {}
+        self.save_state('init')
 
     def formula(self, include_cat = True, include_cont = True,
                       include_interactions = True, dv = None,
@@ -159,6 +164,10 @@ class Model:
         xvars = sum(map(lambda type_ : xvars[type_], order), [])
 
         return dv + ' ~ ' + ' + '.join(xvars)
+
+    def regress(self, data, **kwargs):
+        results = smf.ols(self.formula(**kwargs), data).fit()
+        return results
 
     def remove_var(self, *vars_):
         for var in vars_:
@@ -184,11 +193,15 @@ class Model:
         else:
             self.interactions.append(sep.join(vars_))
 
-    def set_baseline(self):
-        self.baseline = self.y, self.X_cat.copy(), self.X_cont.copy(), self.interactions.copy()
+    def save_state(self, name):
+        self.state_dict[name] = (self.y, self.X_cat.copy(), self.X_cont.copy(), self.interactions.copy())
 
-    def reset_to_baseline(self):
-        self.y, self.X_cat, self.X_cont, self.interactions = self.baseline
+    def restore_state(self, name):
+        self.y, self.X_cat, self.X_cont, self.interactions = self.state_dict[name]
+        self.X_cat, self.X_cont, self.interactions = \
+            map(lambda list_ : list_.copy(),
+                [self.X_cat, self.X_cont, self.interactions]
+            )
 
     def _wrap_cat(self):
         return lmap(lambda var : f'C({var})', self.X_cat)
@@ -219,12 +232,11 @@ class Model:
                 if var in self.X_cat:
                     return None
             return interaction
-        return filternullmap(is_cont_interaction, self.interactions)
+        return lfilternullmap(is_cont_interaction, self.interactions)
 
 
-    def clone_as_baseline(self):
+    def clone(self):
         out = Model(self.y, self.X_cat, self.X_cont, self.interactions)
-        out.set_baseline()
         return out
 
 # Modified from the Seaborn Gallery
