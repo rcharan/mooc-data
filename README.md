@@ -7,8 +7,8 @@ students in 6 classes over a period of 2 years (2013-2014).
 activities and activity patterns and learning outcomes (class grade).
 
 ## Contributors
-Ravi Charan ([github](https://github.com/rcharan/))
-Gabriel Seeman ([github](https://github.com/gseemann))
+- Ravi Charan ([github](https://github.com/rcharan/))
+- Gabriel Seeman ([github](https://github.com/gseemann))
 
 ## Background
 This is our third Flatiron School project (NYC Data Science), for module 4
@@ -18,14 +18,14 @@ or view the pdf in our repository.
 
 ## How to use this Repo
 There are two Jupyter notebooks, feature-engineering.ipynb and analysis.ipynb.
-- *feature-engineer* assembles the dataset and engineers a number of features
+- _feature-engineering_ assembles the dataset and engineers a number of features
 related to activity and attention metrics. To use this, you will have to download
 the original dataset from the Open University (link above). It is about 500MB. The
-directory of csvs as "anonymisedData" in the directory structure.
-- *analysis* performs the analysis for the presentation. It works with the 5MB dataset
+directory of csvs should be put in the top level of the directory structure as "anonymisedData".
+- _analysis_ performs the analysis for the presentation. It works with the 5MB dataset
 in the repository
 
-There is also a utilities.py file that provides a number of conveniences for use in the
+There is also a _utilities.py_ file that provides a number of conveniences for use in the
 notebooks.
 
 Software required: statsmodels, pandas, scipy, and seaborn, as well as their dependencies.
